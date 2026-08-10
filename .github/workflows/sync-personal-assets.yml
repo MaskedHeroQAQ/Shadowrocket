@@ -1,0 +1,85 @@
+name: Sync personalized Shadowrocket assets
+
+on:
+  schedule:
+    - cron: "37 0 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-personal-assets
+  cancel-in-progress: false
+
+jobs:
+  sync-youtube-maasea:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out personal branch
+        uses: actions/checkout@v4
+        with:
+          ref: personal
+          fetch-depth: 0
+
+      - name: Merge upstream YouTube module
+        shell: bash
+        env:
+          UPSTREAM_URL: https://raw.githubusercontent.com/QingRex/LoonKissSurge/refs/heads/main/Surge/Official/YouTube%E5%8E%BB%E5%B9%BF%E5%91%8A%5BMaasea%5D.official.sgmodule
+        run: |
+          set -euo pipefail
+
+          baseline=".upstream/youtube-maasea.sgmodule"
+          personal="modules/youtube-maasea.sgmodule"
+          incoming="${RUNNER_TEMP}/youtube-maasea.new"
+          merged="${RUNNER_TEMP}/youtube-maasea.merged"
+
+          curl --fail --location --silent --show-error             --retry 3 --retry-delay 2             "$UPSTREAM_URL" -o "$incoming"
+
+          test -s "$incoming"
+          test -s "$baseline"
+          test -s "$personal"
+
+          if cmp -s "$baseline" "$incoming"; then
+            echo "No upstream module change."
+            exit 0
+          fi
+
+          set +e
+          git merge-file -p "$personal" "$baseline" "$incoming" > "$merged"
+          merge_status=$?
+          set -e
+
+          if [ "$merge_status" -ne 0 ]; then
+            echo "::error::Upstream and personal module edits overlap; keeping the last known-good version."
+            exit 1
+          fi
+
+          if grep -Eq '^(<<<<<<<|=======|>>>>>>>)' "$merged"; then
+            echo "::error::Merge markers detected; keeping the last known-good version."
+            exit 1
+          fi
+
+          grep -q '^#!name=' "$merged"
+          grep -q '^\[Script\]$' "$merged"
+          grep -q '^\[MITM\]$' "$merged"
+
+          cp "$incoming" "$baseline"
+          cp "$merged" "$personal"
+          git diff --check
+
+      - name: Commit synchronized module
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if git diff --quiet -- .upstream/youtube-maasea.sgmodule modules/youtube-maasea.sgmodule; then
+            echo "Nothing to commit."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .upstream/youtube-maasea.sgmodule modules/youtube-maasea.sgmodule
+          git commit -m "Sync upstream YouTube Maasea module"
+          git push origin HEAD:personal
