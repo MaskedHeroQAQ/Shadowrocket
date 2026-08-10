@@ -83,6 +83,7 @@ jobs:
           baseline=".upstream/youtube-maasea.sgmodule"
           personal="modules/youtube-maasea.sgmodule"
           incoming="${RUNNER_TEMP}/youtube-maasea.new"
+          personal_for_merge="${RUNNER_TEMP}/youtube-maasea.personal-for-merge"
           merged="${RUNNER_TEMP}/youtube-maasea.merged"
 
           curl --fail --location --silent --show-error \
@@ -94,17 +95,39 @@ jobs:
           test -s "$personal"
 
           if cmp -s "$baseline" "$incoming"; then
-            echo "No upstream module change."
-            exit 0
+            echo "No upstream module change; verifying pinned personal options."
+          else
+            echo "Upstream module change detected."
           fi
 
+          python3 - "$personal" "$baseline" "$personal_for_merge" <<'PY'
+          from pathlib import Path
+          import sys
+
+          personal_path, baseline_path, output_path = map(Path, sys.argv[1:])
+          personal_lines = personal_path.read_text(encoding="utf-8").splitlines(keepends=True)
+          baseline_lines = baseline_path.read_text(encoding="utf-8").splitlines(keepends=True)
+
+          personal_hits = [index for index, line in enumerate(personal_lines) if line.startswith("#!arguments=")]
+          baseline_hits = [index for index, line in enumerate(baseline_lines) if line.startswith("#!arguments=")]
+          if len(personal_hits) != 1 or len(baseline_hits) != 1:
+              raise SystemExit("Expected exactly one #!arguments line in personal and baseline modules")
+
+          personal_index = personal_hits[0]
+          baseline_argument = baseline_lines[baseline_hits[0]].rstrip("\r\n")
+          original_line = personal_lines[personal_index]
+          ending = "\r\n" if original_line.endswith("\r\n") else "\n" if original_line.endswith("\n") else ""
+          personal_lines[personal_index] = baseline_argument + ending
+          output_path.write_text("".join(personal_lines), encoding="utf-8")
+          PY
+
           set +e
-          git merge-file -p "$personal" "$baseline" "$incoming" > "$merged"
+          git merge-file -p "$personal_for_merge" "$baseline" "$incoming" > "$merged"
           merge_status=$?
           set -e
 
           if [ "$merge_status" -ne 0 ]; then
-            echo "::error::Upstream and personal module edits overlap; keeping the last known-good version."
+            echo "::error::Upstream and personal module edits overlap outside the pinned options; keeping the last known-good version."
             exit 1
           fi
 
@@ -113,9 +136,58 @@ jobs:
             exit 1
           fi
 
+          python3 - "$merged" <<'PY'
+          from pathlib import Path
+          import sys
+
+          module_path = Path(sys.argv[1])
+          text = module_path.read_text(encoding="utf-8")
+          newline = "\r\n" if "\r\n" in text else "\n"
+          lines = text.splitlines()
+          hits = [index for index, line in enumerate(lines) if line.startswith("#!arguments=")]
+          if len(hits) != 1:
+              raise SystemExit("Expected exactly one #!arguments line in merged module")
+
+          pinned = {
+              "屏蔽上传按钮": "true",
+              "屏蔽选段按钮": "false",
+              "屏蔽Shorts按钮": "true",
+              "字幕翻译语言": "off",
+              "歌词翻译语言": "off",
+              "启用调试模式": "false",
+          }
+
+          index = hits[0]
+          prefix = "#!arguments="
+          items = lines[index][len(prefix):].split(",")
+          updated = []
+          seen = set()
+          for item in items:
+              key, separator, value = item.partition(":")
+              if separator and key in pinned:
+                  updated.append(f"{key}:{pinned[key]}")
+                  seen.add(key)
+              else:
+                  updated.append(item)
+
+          for key, value in pinned.items():
+              if key not in seen:
+                  updated.append(f"{key}:{value}")
+
+          lines[index] = prefix + ",".join(updated)
+          suffix = newline if text.endswith(("\n", "\r")) else ""
+          module_path.write_text(newline.join(lines) + suffix, encoding="utf-8")
+          PY
+
           grep -q '^#!name=' "$merged"
           grep -q '^\[Script\]$' "$merged"
           grep -q '^\[MITM\]$' "$merged"
+          grep -Fq '屏蔽上传按钮:true' "$merged"
+          grep -Fq '屏蔽选段按钮:false' "$merged"
+          grep -Fq '屏蔽Shorts按钮:true' "$merged"
+          grep -Fq '字幕翻译语言:off' "$merged"
+          grep -Fq '歌词翻译语言:off' "$merged"
+          grep -Fq '启用调试模式:false' "$merged"
 
           cp "$incoming" "$baseline"
           cp "$merged" "$personal"
