@@ -152,7 +152,7 @@ jobs:
               "屏蔽上传按钮": "true",
               "屏蔽选段按钮": "false",
               "屏蔽Shorts按钮": "true",
-              "字幕翻译语言": "zh-Hans",
+              "字幕翻译语言": "off",
               "启用调试模式": "false",
           }
 
@@ -184,7 +184,7 @@ jobs:
           grep -Fq '屏蔽上传按钮:true' "$merged"
           grep -Fq '屏蔽选段按钮:false' "$merged"
           grep -Fq '屏蔽Shorts按钮:true' "$merged"
-          grep -Fq '字幕翻译语言:zh-Hans' "$merged"
+          grep -Fq '字幕翻译语言:off' "$merged"
           if grep -Fq '歌词翻译语言:' "$merged"; then
             echo "::error::Removed upstream lyric option was reintroduced."
             exit 1
