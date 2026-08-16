@@ -76,7 +76,7 @@ jobs:
       - name: Merge upstream YouTube module
         shell: bash
         env:
-          UPSTREAM_URL: https://raw.githubusercontent.com/QingRex/LoonKissSurge/refs/heads/main/Surge/Official/YouTube%E5%8E%BB%E5%B9%BF%E5%91%8A%5BMaasea%5D.official.sgmodule
+          UPSTREAM_URL: https://raw.githubusercontent.com/Maasea/sgmodule/master/YouTube.Enhance.sgmodule
         run: |
           set -euo pipefail
 
@@ -152,8 +152,7 @@ jobs:
               "屏蔽上传按钮": "true",
               "屏蔽选段按钮": "false",
               "屏蔽Shorts按钮": "true",
-              "字幕翻译语言": "off",
-              "歌词翻译语言": "off",
+              "字幕翻译语言": "zh-Hans",
               "启用调试模式": "false",
           }
 
@@ -185,8 +184,11 @@ jobs:
           grep -Fq '屏蔽上传按钮:true' "$merged"
           grep -Fq '屏蔽选段按钮:false' "$merged"
           grep -Fq '屏蔽Shorts按钮:true' "$merged"
-          grep -Fq '字幕翻译语言:off' "$merged"
-          grep -Fq '歌词翻译语言:off' "$merged"
+          grep -Fq '字幕翻译语言:zh-Hans' "$merged"
+          if grep -Fq '歌词翻译语言:' "$merged"; then
+            echo "::error::Removed upstream lyric option was reintroduced."
+            exit 1
+          fi
           grep -Fq '启用调试模式:false' "$merged"
 
           cp "$incoming" "$baseline"
