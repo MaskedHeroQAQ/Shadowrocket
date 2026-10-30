@@ -1,5 +1,7 @@
 [![Translate to English](https://img.shields.io/static/v1?label=Translate&message=to%20English&color=blue&logo=googletranslate&logoColor=white&labelColor=grey&messageColor=white)](https://translate.google.com/translate?hl=en&sl=zh-CN&tl=en&u=https://github.com/LOWERTOP/Shadowrocket/wiki "Google Translate")
 
+独立 Clash/Mihomo WebRTC 规则集与自动同步说明：[WEBRTC.md](WEBRTC.md)。
+
 [![Shadowrocket](https://socialify.git.ci/LOWERTOP/Shadowrocket/image?custom_description=%E4%BD%BF%E7%94%A8%E6%89%8B%E5%86%8C%0AUser+Manual&description=1&font=Rokkitt&logo=https%3A%2F%2Fraw.githubusercontent.com%2FLOWERTOP%2FShadowrocket-First%2Frefs%2Fheads%2Fmain%2Fimg%2FShadowrocket.png&name=1&pattern=Plus&theme=Light)](https://github.com/LOWERTOP/Shadowrocket "仓库地址")
 
 > [!NOTE]

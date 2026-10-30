@@ -1,0 +1,46 @@
+name: Sync standalone WebRTC rules
+
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-personal-assets
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out publication branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: personal
+
+      - name: Test extraction guards
+        run: python3 -m unittest discover -s tests -v
+
+      - name: Extract and validate upstream WebRTC rules
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/sync_webrtc.py
+
+      - name: Publish only changed rule assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add rulesets/webrtc.yaml rulesets/webrtc-source.json
+          if git diff --cached --quiet; then
+            echo "WebRTC rules unchanged; retaining published assets."
+            exit 0
+          fi
+          git diff --cached --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Sync standalone WebRTC rules"
+          git push origin HEAD:personal
