@@ -1,0 +1,7 @@
+{
+  "upstream": "Niklaus88/Clash-Config",
+  "path": "clash-ios-script.js",
+  "revision": "5663915392076e2a7432fc1693f2b83af5200886",
+  "source_sha256": "1ad2365d08c2163faa15eb91f77c9363d59f525b5b7a55c3c61fe95a153e7c93",
+  "rule_count": 11
+}
