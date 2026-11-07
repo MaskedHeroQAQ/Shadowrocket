@@ -1,4 +1,4 @@
-name: Sync personalized Shadowrocket assets
+name: Sync YouTube module
 
 on:
   schedule:
@@ -21,67 +21,6 @@ jobs:
         with:
           ref: personal
           fetch-depth: 0
-
-      - name: Merge upstream lazy configurations
-        shell: bash
-        env:
-          LAZY_URL: https://raw.githubusercontent.com/LOWERTOP/Shadowrocket/main/lazy.conf
-          LAZY_GROUP_URL: https://raw.githubusercontent.com/LOWERTOP/Shadowrocket/main/lazy_group.conf
-        run: |
-          set -euo pipefail
-
-          merge_config() {
-            local url="$1" baseline="$2" personal="$3" require_group="$4"
-            local name incoming merged merge_status
-            name="$(basename "$personal" .conf)"
-            incoming="${RUNNER_TEMP}/${name}.new"
-            merged="${RUNNER_TEMP}/${name}.merged"
-
-            curl --fail --location --silent --show-error \
-              --retry 3 --retry-delay 2 \
-              "$url" -o "$incoming"
-
-            test -s "$incoming"
-            test -s "$baseline"
-            test -s "$personal"
-            sed -i 's/[[:space:]]\+$//' "$incoming"
-
-            if cmp -s "$baseline" "$incoming"; then
-              echo "No upstream change for $personal."
-              return
-            fi
-
-            set +e
-            git merge-file -p "$personal" "$baseline" "$incoming" > "$merged"
-            merge_status=$?
-            set -e
-
-            if [ "$merge_status" -ne 0 ]; then
-              echo "::error::Upstream and personal edits overlap for $personal; keeping the last known-good version."
-              exit 1
-            fi
-
-            if grep -Eq '^(<<<<<<<|=======|>>>>>>>)' "$merged"; then
-              echo "::error::Merge markers detected in $personal; keeping the last known-good version."
-              exit 1
-            fi
-
-            grep -q '^\[General\]$' "$merged"
-            grep -q '^\[Proxy Group\]$' "$merged"
-            grep -q '^\[Rule\]$' "$merged"
-            if [ "$require_group" = true ]; then
-              grep -q '^stun-response-ip = 1\.1\.1\.1$' "$merged"
-              grep -q '^stun-response-ipv6 = ::1$' "$merged"
-              grep -Fq 'RULE-SET,https://raw.githubusercontent.com/RocM301/Apple-Rule/refs/heads/main/Apple-AI.list,AI' "$merged"
-            fi
-
-            cp "$incoming" "$baseline"
-            cp "$merged" "$personal"
-          }
-
-          merge_config "$LAZY_URL" .upstream/lazy.conf lazy.conf false
-          merge_config "$LAZY_GROUP_URL" .upstream/lazy_group.conf lazy_group.conf true
-          git diff --check
 
       - name: Merge upstream YouTube module
         shell: bash
@@ -211,10 +150,6 @@ jobs:
           set -euo pipefail
 
           if git diff --quiet -- \
-            .upstream/lazy.conf \
-            lazy.conf \
-            .upstream/lazy_group.conf \
-            lazy_group.conf \
             .upstream/youtube-maasea.sgmodule \
             modules/youtube-maasea.sgmodule; then
             echo "Nothing to commit."
@@ -224,11 +159,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add \
-            .upstream/lazy.conf \
-            lazy.conf \
-            .upstream/lazy_group.conf \
-            lazy_group.conf \
             .upstream/youtube-maasea.sgmodule \
             modules/youtube-maasea.sgmodule
-          git commit -m "Sync personalized Shadowrocket assets"
+          git commit -m "Sync YouTube module"
           git push origin HEAD:personal
