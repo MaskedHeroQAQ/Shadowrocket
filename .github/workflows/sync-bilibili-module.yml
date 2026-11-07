@@ -1,0 +1,70 @@
+name: Sync Bilibili module
+
+on:
+  schedule:
+    - cron: "47 0 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-personal-assets
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out personal branch
+        uses: actions/checkout@v7
+        with:
+          ref: personal
+          fetch-depth: 0
+
+      - name: Mirror upstream Bilibili module
+        shell: bash
+        env:
+          UPSTREAM_URL: https://raw.githubusercontent.com/QingRex/LoonKissSurge/refs/heads/main/Surge/Official/bilibili%E5%8E%BB%E5%B9%BF%E5%91%8A.official.sgmodule
+        run: |
+          set -euo pipefail
+
+          target="modules/bilibili-qingrex.sgmodule"
+          incoming="${RUNNER_TEMP}/bilibili.new"
+
+          curl --fail --location --silent --show-error \
+            --retry 3 --retry-delay 2 \
+            "$UPSTREAM_URL" -o "$incoming"
+
+          # Keep the last known-good version unless the download is a real module.
+          test -s "$incoming"
+          grep -q '^#!name=' "$incoming"
+          grep -q '^\[Script\]$' "$incoming"
+          grep -q '^\[MITM\]$' "$incoming"
+          if grep -Eiq '^(<<<<<<<|=======|>>>>>>>)|<html' "$incoming"; then
+            echo "::error::Upstream file does not look like a module; keeping the last known-good version."
+            exit 1
+          fi
+
+          if cmp -s "$target" "$incoming"; then
+            echo "No upstream module change."
+          else
+            echo "Upstream module change detected."
+            cp "$incoming" "$target"
+          fi
+
+      - name: Commit synchronized module
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if git diff --quiet -- modules/bilibili-qingrex.sgmodule; then
+            echo "Nothing to commit."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add modules/bilibili-qingrex.sgmodule
+          git commit -m "Sync Bilibili module"
+          git push origin HEAD:personal
